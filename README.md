@@ -54,8 +54,36 @@ The Gmail MCP Server consists of two components:
 ## Prerequisites
 
 - **Docker** and **Docker Compose** installed
+- **Docker permissions** configured (see setup below)
 - **Gmail API credentials** (access token)
 - **OpenWebUI** already running (any version with Tools support)
+
+### Docker Permissions Setup
+
+The bridge server needs access to the Docker socket to communicate with the MCP server container. You have two options:
+
+**Option 1: Add your user to the docker group (Recommended)**
+
+```bash
+# Add your user to the docker group
+sudo usermod -aG docker $USER
+
+# Activate the changes
+newgrp docker
+
+# Verify it works
+docker ps
+```
+
+After this, you can run docker commands without `sudo`.
+
+**Option 2: Run with sudo**
+
+If you prefer not to add your user to the docker group, run all docker-compose commands with `sudo`:
+
+```bash
+sudo docker-compose up -d --build
+```
 
 ## Quick Start
 
@@ -111,6 +139,8 @@ Or manually with Docker Compose:
 ```bash
 docker-compose up -d --build
 ```
+
+**Note:** If you get permission errors, you may need to run with `sudo` or add your user to the docker group (see Prerequisites → Docker Permissions Setup above).
 
 The Gmail MCP Bridge will be available at: **http://localhost:3002**
 
@@ -291,6 +321,42 @@ docker-compose logs
 # Restart servers
 docker-compose restart
 ```
+
+### Docker Permission Errors
+
+If you see errors like:
+- `PermissionError: [Errno 13] Permission denied`
+- `Error while fetching server API version: Connection aborted`
+- `docker: not found` (when running inside bridge container)
+
+**Solution 1: Add user to docker group (Recommended)**
+
+```bash
+# Add your user to the docker group
+sudo usermod -aG docker $USER
+
+# Log out and back in, or run:
+newgrp docker
+
+# Verify it works
+docker ps
+
+# Restart the services
+docker-compose down
+docker-compose up -d --build
+```
+
+**Solution 2: Run with sudo**
+
+```bash
+sudo docker-compose down
+sudo docker-compose up -d --build
+sudo docker-compose logs -f
+```
+
+**Why this happens:**
+
+The bridge container needs to execute `docker exec` commands to communicate with the gmail-mcp-server container. This requires access to `/var/run/docker.sock`, which is only accessible by the docker group or root.
 
 ### Gmail API authentication errors
 
