@@ -2,14 +2,17 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install dependencies
+# Install Docker CLI so we can exec into other containers
+RUN apk add --no-cache docker-cli
+
+# Install Node.js dependencies
 RUN npm install express cors
 
 # Copy bridge server
 COPY bridge-server.js .
 
 # Expose port
-EXPOSE 3001
+EXPOSE 3002
 
 # Run the bridge server
 CMD ["node", "bridge-server.js"]
