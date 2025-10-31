@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # OpenWebUI with Gmail MCP integration
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: openwebui
+    ports:
+      - "3000:8080"
+    volumes:
+      # Mount the Gmail MCP server
+      - ./gmail_mcp.py:/app/mcp/gmail_mcp.py:ro
+      - ./requirements.txt:/app/mcp/requirements.txt:ro
+      # OpenWebUI data persistence
+      - openwebui-data:/app/backend/data
+      # Optional: Mount config if using file-based config
+      - ./config:/app/backend/data/config
+    environment:
+      # Gmail API Access Token
+      - GMAIL_ACCESS_TOKEN=${GMAIL_ACCESS_TOKEN}
+      
+      # OpenWebUI settings
+      - WEBUI_NAME=OpenWebUI with Gmail
+      - ENABLE_SIGNUP=true
+      - DEFAULT_MODELS=llama3.2:latest
+      
+      # Ollama connection (if using Ollama)
+      - OLLAMA_BASE_URL=http://ollama:11434
+      
+      # Optional: Other API endpoints
+      # - OPENAI_API_BASE_URL=http://localhost:8000/v1
+      # - OPENAI_API_KEY=your_key_here
+      
+      # MCP Server Configuration
+      - ENABLE_MCP=true
+      - MCP_SERVERS=gmail
+      
+      # Python path for MCP server
+      - PYTHONPATH=/app/mcp
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    networks:
+      - ai-network
+    command: >
+      sh -c "
+        echo 'Installing Gmail MCP dependencies...' &&
+        pip install --no-cache-dir -r /app/mcp/requirements.txt &&
+        echo 'Starting OpenWebUI...' &&
+        bash start.sh
+      "
+
+  # Ollama service for local LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - ai-network
+    # Uncomment for GPU support (NVIDIA)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Optional: Nginx reverse proxy for HTTPS
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: nginx-proxy
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - openwebui
+  #   networks:
+  #     - ai-network
+  #   restart: unless-stopped
+
+volumes:
+  openwebui-data:
+    driver: local
+  ollama-data:
+    driver: local
+
+networks:
+  ai-network:
+    driver: bridge
