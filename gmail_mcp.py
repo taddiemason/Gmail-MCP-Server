@@ -425,6 +425,132 @@ async def gmail_search_messages(params: GmailSearchInput, ctx: Context) -> str:
 
 
 # ============================================================================
+# EMAIL SUMMARIZATION TOOLS
+# ============================================================================
+
+class SummarizeEmailsInput(BaseModel):
+    """Input model for summarizing multiple emails."""
+    model_config = ConfigDict(str_strip_whitespace=True, validate_assignment=True, extra='forbid')
+
+    query: str = Field(
+        ...,
+        description=(
+            "Gmail search query to find emails to summarize. Examples:\n"
+            "- 'is:unread' - summarize unread emails\n"
+            "- 'from:john@example.com after:2024/10/01' - emails from John since Oct 1\n"
+            "- 'subject:meeting' - emails about meetings\n"
+            "Use Gmail search operators to filter emails for summarization."
+        ),
+        min_length=1,
+        max_length=500
+    )
+    max_results: int = Field(
+        default=10,
+        description="Maximum number of emails to include in summary",
+        ge=1,
+        le=50
+    )
+    include_body: bool = Field(
+        default=True,
+        description="Include email body content (recommended for detailed summaries)"
+    )
+
+
+@mcp.tool(
+    name="gmail_summarize_emails",
+    annotations={
+        "title": "Summarize Gmail Messages",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def gmail_summarize_emails(params: SummarizeEmailsInput, ctx: Context) -> str:
+    """Fetch and format emails for summarization by the AI assistant.
+
+    This tool retrieves multiple emails based on a search query and formats them
+    in a way that makes it easy for the AI to generate summaries. The actual
+    summarization is performed by the AI assistant, not this tool.
+
+    Args:
+        params (SummarizeEmailsInput): Parameters containing:
+            - query (str): Gmail search query to find emails
+            - max_results (int): Maximum emails to include (default: 10, max: 50)
+            - include_body (bool): Include email body content for detailed summaries
+
+    Returns:
+        str: Formatted email data ready for AI summarization
+
+    Examples:
+        - Summarize unread emails: query="is:unread"
+        - Summarize today's emails: query="after:2024/10/31"
+        - Summarize emails from a person: query="from:john@example.com"
+    """
+    try:
+        # Search for emails
+        search_params = {
+            "q": params.query,
+            "maxResults": params.max_results
+        }
+
+        response = await make_gmail_request(ctx, "GET", "/users/me/messages", params=search_params)
+
+        messages = response.get("messages", [])
+        result_size_estimate = response.get("resultSizeEstimate", 0)
+
+        if not messages:
+            return "No messages found matching the search query. Cannot generate summary."
+
+        # Fetch details for each message
+        detailed_messages = []
+        for msg in messages:
+            msg_detail = await make_gmail_request(ctx, "GET", f"/users/me/messages/{msg['id']}")
+            detailed_messages.append(msg_detail)
+
+        # Format for summarization
+        result = f"# Emails for Summarization\n\n"
+        result += f"**Search Query:** `{params.query}`\n"
+        result += f"**Emails Retrieved:** {len(messages)} of approximately {result_size_estimate} total\n"
+        result += f"**Note:** Please provide a concise summary of these emails.\n\n"
+        result += "---\n\n"
+
+        for i, msg in enumerate(detailed_messages, 1):
+            headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+
+            result += f"## Email {i}/{len(messages)}\n\n"
+            result += f"**Subject:** {headers.get('Subject', '(No Subject)')}\n"
+            result += f"**From:** {headers.get('From', 'Unknown')}\n"
+            result += f"**To:** {headers.get('To', 'Unknown')}\n"
+            result += f"**Date:** {headers.get('Date', 'Unknown')}\n"
+
+            # Include snippet for quick overview
+            result += f"**Snippet:** {msg.get('snippet', '')}\n"
+
+            # Optionally include body for detailed summary
+            if params.include_body:
+                body = extract_email_body(msg)
+                if body:
+                    # Truncate very long bodies to keep response manageable
+                    body_preview = body[:1000] + "..." if len(body) > 1000 else body
+                    result += f"\n**Content:**\n{body_preview}\n"
+
+            # Check for attachments
+            attachments = extract_attachments_info(msg)
+            if attachments:
+                result += f"**Attachments:** {', '.join([a['filename'] for a in attachments])}\n"
+
+            result += "\n---\n\n"
+
+        return truncate_response(result)
+
+    except httpx.HTTPStatusError as e:
+        return f"Error fetching emails for summary: {str(e)}. Please check your query syntax."
+    except Exception as e:
+        return f"Unexpected error: {str(e)}"
+
+
+# ============================================================================
 # READ EMAIL TOOLS
 # ============================================================================
 
