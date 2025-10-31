@@ -40,7 +40,7 @@ class ResponseFormat(str, Enum):
 
 # Lifespan management for persistent HTTP client
 @asynccontextmanager
-async def app_lifespan():
+async def app_lifespan(app):
     """Manage HTTP client lifecycle."""
     client = httpx.AsyncClient(timeout=30.0)
     yield {"http_client": client}
