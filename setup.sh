@@ -108,18 +108,23 @@ case $choice in
         print_info "Waiting for server to be ready..."
         sleep 3
 
-        print_info "Checking if server is running..."
+        print_info "Checking if servers are running..."
         if docker-compose ps | grep -q "Up"; then
-            print_success "Gmail MCP Server is running!"
+            print_success "Gmail MCP Servers are running!"
             echo ""
-            print_info "Server is available at: http://localhost:3002"
+            print_info "Bridge API available at: http://localhost:3001"
+            print_info "Health check: curl http://localhost:3001/health"
             echo ""
             print_info "To connect from OpenWebUI:"
-            print_info "1. Go to OpenWebUI Settings > Admin Panel > MCP Servers"
-            print_info "2. Add a new MCP server with URL: http://gmail-mcp-server:3002"
-            print_info "   (or http://localhost:3002 if OpenWebUI is not in Docker)"
+            print_info "1. Go to OpenWebUI Settings > Admin Panel > Tools"
+            print_info "2. Click '+ Create New Tool'"
+            print_info "3. Copy contents of gmail_tools.py and paste into editor"
+            print_info "4. Configure bridge URL in Valves:"
+            print_info "   - Docker: http://gmail-mcp-bridge:3001"
+            print_info "   - Local: http://localhost:3001"
+            print_info "5. Save and enable the tool"
         else
-            print_error "Server failed to start. Check logs with: docker-compose logs"
+            print_error "Servers failed to start. Check logs with: docker-compose logs"
         fi
         ;;
 
