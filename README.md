@@ -51,7 +51,7 @@ Gmail MCP Server provides a complete set of tools for AI assistants to interact 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/Gmail-MCP-Server.git
+git clone https://github.com/taddiemason/Gmail-MCP-Server.git
 cd Gmail-MCP-Server
 ```
 
