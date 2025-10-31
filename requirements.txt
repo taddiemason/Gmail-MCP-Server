@@ -1,0 +1,17 @@
+# Gmail MCP Server Dependencies
+
+# Core MCP SDK
+mcp>=0.1.0
+
+# HTTP client for Gmail API
+httpx>=0.24.0
+
+# Data validation
+pydantic>=2.0.0
+
+# Attachment text extraction
+PyPDF2>=3.0.0
+python-docx>=1.0.0
+
+# Optional: For better async performance
+anyio>=3.7.0
