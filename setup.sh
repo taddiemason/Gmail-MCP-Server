@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Gmail MCP + OpenWebUI Setup Script
-# This script automates the setup process
+# Gmail MCP Server Setup Script
+# This script automates the setup and management of the Gmail MCP Server
 
 set -e
 
@@ -39,7 +39,7 @@ echo -e "${GREEN}"
 cat << "EOF"
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║      Gmail MCP + OpenWebUI Setup                         ║
+║      Gmail MCP Server Setup                              ║
 ║      Automated Deployment Script                         ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
@@ -88,115 +88,90 @@ print_success "Gmail access token found in .env"
 # Ask user what to do
 echo ""
 print_info "What would you like to do?"
-echo "1) Start services"
-echo "2) Stop services"
-echo "3) Restart services"
+echo "1) Start Gmail MCP Server"
+echo "2) Stop Gmail MCP Server"
+echo "3) Restart Gmail MCP Server"
 echo "4) View logs"
-echo "5) Download LLM model"
-echo "6) Check status"
-echo "7) Update services"
-echo "8) Clean up (remove all data)"
-echo "9) Exit"
+echo "5) Check status"
+echo "6) Update server"
+echo "7) Clean up (remove all data)"
+echo "8) Exit"
 echo ""
-read -p "Enter your choice (1-9): " choice
+read -p "Enter your choice (1-8): " choice
 
 case $choice in
     1)
-        print_info "Starting services..."
-        docker-compose up -d
-        print_success "Services started!"
+        print_info "Starting Gmail MCP Server..."
+        docker-compose up -d --build
+        print_success "Server started!"
         echo ""
-        print_info "Waiting for services to be ready..."
-        sleep 5
-        
-        print_info "Checking if services are running..."
+        print_info "Waiting for server to be ready..."
+        sleep 3
+
+        print_info "Checking if server is running..."
         if docker-compose ps | grep -q "Up"; then
-            print_success "Services are running!"
+            print_success "Gmail MCP Server is running!"
             echo ""
-            print_info "OpenWebUI: http://localhost:3000"
-            print_info "Ollama API: http://localhost:11434"
+            print_info "Server is available at: http://localhost:3002"
             echo ""
-            print_warning "Don't forget to download a model!"
-            print_info "Run: docker exec -it ollama ollama pull llama3.2"
+            print_info "To connect from OpenWebUI:"
+            print_info "1. Go to OpenWebUI Settings > Admin Panel > MCP Servers"
+            print_info "2. Add a new MCP server with URL: http://gmail-mcp-server:3002"
+            print_info "   (or http://localhost:3002 if OpenWebUI is not in Docker)"
         else
-            print_error "Services failed to start. Check logs with: docker-compose logs"
+            print_error "Server failed to start. Check logs with: docker-compose logs"
         fi
         ;;
-    
+
     2)
-        print_info "Stopping services..."
+        print_info "Stopping Gmail MCP Server..."
         docker-compose down
-        print_success "Services stopped!"
+        print_success "Server stopped!"
         ;;
-    
+
     3)
-        print_info "Restarting services..."
+        print_info "Restarting Gmail MCP Server..."
         docker-compose restart
-        print_success "Services restarted!"
+        print_success "Server restarted!"
         ;;
-    
+
     4)
         print_info "Showing logs (Ctrl+C to exit)..."
         docker-compose logs -f
         ;;
-    
+
     5)
-        print_info "Available models:"
-        echo "1) llama3.2 (3B) - Fast, good for most tasks"
-        echo "2) llama3.1 (8B) - Better quality, slower"
-        echo "3) mistral (7B) - Good balance"
-        echo "4) qwen2.5 (7B) - Strong function calling"
-        echo ""
-        read -p "Enter model number (1-4): " model_choice
-        
-        case $model_choice in
-            1) MODEL="llama3.2";;
-            2) MODEL="llama3.1";;
-            3) MODEL="mistral";;
-            4) MODEL="qwen2.5";;
-            *) print_error "Invalid choice"; exit 1;;
-        esac
-        
-        print_info "Downloading $MODEL..."
-        docker exec -it ollama ollama pull $MODEL
-        print_success "Model $MODEL downloaded!"
-        ;;
-    
-    6)
-        print_info "Service status:"
+        print_info "Server status:"
         docker-compose ps
         echo ""
         print_info "Resource usage:"
-        docker stats --no-stream
-        echo ""
-        print_info "Available models:"
-        docker exec -it ollama ollama list
+        docker stats --no-stream gmail-mcp-server 2>/dev/null || print_warning "Server not running"
         ;;
-    
-    7)
-        print_info "Updating services..."
+
+    6)
+        print_info "Updating Gmail MCP Server..."
         docker-compose pull
-        docker-compose up -d --force-recreate
-        print_success "Services updated!"
+        docker-compose up -d --build --force-recreate
+        print_success "Server updated!"
         ;;
-    
-    8)
-        print_warning "This will DELETE all data including models and conversations!"
+
+    7)
+        print_warning "This will STOP the server and remove all containers!"
         read -p "Are you sure? (yes/no): " confirm
         if [ "$confirm" = "yes" ]; then
-            print_info "Stopping and removing everything..."
-            docker-compose down -v
-            print_success "All data removed!"
+            print_info "Stopping and removing containers..."
+            docker-compose down
+            print_success "All containers removed!"
         else
             print_info "Cancelled"
         fi
         ;;
-    
-    9)
+
+    8)
         print_info "Goodbye!"
         exit 0
         ;;
-    
+
     *)
         print_error "Invalid choice"
         exit 1

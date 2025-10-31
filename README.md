@@ -1,10 +1,10 @@
 # Gmail MCP Server
 
-A comprehensive Model Context Protocol (MCP) server that enables AI agents and assistants to manage Gmail accounts through natural language commands. This server acts as middleware that translates AI commands into secure Gmail API calls.
+A standalone Model Context Protocol (MCP) server that enables AI agents and assistants to manage Gmail accounts through natural language commands. This server acts as middleware that translates AI commands into secure Gmail API calls.
 
 ## Overview
 
-Gmail MCP Server provides a complete set of tools for AI assistants to interact with Gmail, including:
+Gmail MCP Server is a standalone service that connects to any MCP-compatible client (like OpenWebUI, Claude Desktop, or other AI assistants) and provides complete Gmail integration capabilities:
 
 - **Email Search**: Search emails using keywords, sender names, date ranges, and Gmail operators
 - **Email Reading**: Read email content and view conversation threads
@@ -51,7 +51,7 @@ Gmail MCP Server provides a complete set of tools for AI assistants to interact 
 
 - **Docker** and **Docker Compose** installed on your system
 - **Gmail API credentials** (access token)
-- Basic understanding of Docker and Gmail API
+- **An MCP-compatible client** (OpenWebUI, Claude Desktop, etc.) already running
 
 ## Quick Start
 
@@ -64,25 +64,17 @@ cd Gmail-MCP-Server
 
 ### 2. Configure Environment
 
-The `.env` file is already created with the following configuration:
+Edit the `.env` file with your Gmail API credentials:
 
 ```bash
 # Gmail API Access Token (required)
 GMAIL_ACCESS_TOKEN=your_gmail_access_token_here
 
-# OpenWebUI Configuration
-OPENWEBUI_ADMIN_EMAIL=admin@example.com
-OPENWEBUI_ADMIN_PASSWORD=changeme
-ENABLE_SIGNUP=true
-DEFAULT_MODELS=llama3.2:latest
+# MCP Server Port (default: 3002)
+MCP_PORT=3002
 
-# Network Configuration
-OPENWEBUI_PORT=3000
-OLLAMA_PORT=11434
-
-# MCP Configuration
-ENABLE_MCP=true
-MCP_SERVERS=gmail
+# Log level (DEBUG, INFO, WARNING, ERROR)
+LOG_LEVEL=INFO
 ```
 
 **Important**: Replace `your_gmail_access_token_here` with your actual Gmail API access token.
@@ -99,52 +91,68 @@ MCP_SERVERS=gmail
 4. Exchange authorization code for tokens
 5. Copy the **Access Token** to your `.env` file
 
-### 4. Run Setup Script
+### 4. Start the MCP Server
+
+Using the setup script:
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-The setup script provides options to:
-- Start/stop/restart services
-- View logs
-- Download LLM models
-- Check service status
-- Update services
-- Clean up data
-
-### 5. Access OpenWebUI
-
-Once services are running, access OpenWebUI at:
-
-```
-http://localhost:3000
-```
-
-Login with the credentials from your `.env` file (default: admin@example.com / changeme)
-
-## Manual Docker Setup
-
-If you prefer to run Docker commands manually:
+Or manually with Docker Compose:
 
 ```bash
-# Start services
-docker-compose up -d
+docker-compose up -d --build
+```
 
-# View logs
-docker-compose logs -f
+The Gmail MCP Server will be available at: **http://localhost:3002**
 
-# Stop services
-docker-compose down
+### 5. Connect to OpenWebUI
 
-# Pull a model (required for first run)
-docker exec -it ollama ollama pull llama3.2
+If you have OpenWebUI already running, connect the Gmail MCP Server:
+
+#### Option A: OpenWebUI in Docker (same network)
+
+1. Add the Gmail MCP server to OpenWebUI's network:
+   ```bash
+   docker network connect openwebui_network gmail-mcp-server
+   ```
+
+2. In OpenWebUI:
+   - Go to **Settings > Admin Panel > MCP Servers**
+   - Click "Add MCP Server"
+   - Server URL: `http://gmail-mcp-server:3002`
+   - Name: `Gmail MCP`
+   - Save
+
+#### Option B: OpenWebUI running locally (not in Docker)
+
+1. In OpenWebUI:
+   - Go to **Settings > Admin Panel > MCP Servers**
+   - Click "Add MCP Server"
+   - Server URL: `http://localhost:3002`
+   - Name: `Gmail MCP`
+   - Save
+
+#### Option C: Configure via OpenWebUI config file
+
+Add to your OpenWebUI MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "gmail": {
+      "command": "http",
+      "args": ["http://localhost:3002"]
+    }
+  }
+}
 ```
 
 ## Available MCP Tools
 
-The Gmail MCP Server provides the following tools:
+The Gmail MCP Server provides 15 tools organized by category:
 
 ### Search & Read
 
@@ -178,18 +186,17 @@ The Gmail MCP Server provides the following tools:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GMAIL_ACCESS_TOKEN` | Gmail API access token (required) | - |
-| `OPENWEBUI_PORT` | Port for OpenWebUI | 3000 |
-| `OLLAMA_PORT` | Port for Ollama API | 11434 |
-| `ENABLE_MCP` | Enable MCP support | true |
-| `MCP_SERVERS` | MCP servers to load | gmail |
-| `DEFAULT_MODELS` | Default LLM model | llama3.2:latest |
+| `MCP_PORT` | Port for MCP server | 3002 |
+| `LOG_LEVEL` | Logging level | INFO |
+| `CHARACTER_LIMIT` | Max response size in characters | 25000 |
 
-### Docker Compose Services
+### Docker Compose Service
 
-- **openwebui**: Web interface for AI assistant (port 3000)
-- **ollama**: Local LLM service (port 11434)
+- **gmail-mcp**: Standalone MCP server (port 3002)
 
 ## Usage Examples
+
+Once connected to OpenWebUI or another MCP client, you can use natural language:
 
 ### Search for emails from a specific sender
 
@@ -235,12 +242,13 @@ Create a label called "Important" and add it to message abc123
 
 ```
 Gmail-MCP-Server/
-├── docker-compose.yml    # Docker services configuration
-├── gmail_mcp.py         # Main MCP server implementation
-├── requirements.txt     # Python dependencies
-├── .env                # Environment configuration
-├── setup.sh            # Setup and management script
-└── README.md           # This file
+├── Dockerfile           # Docker container configuration
+├── docker-compose.yml   # Docker Compose service definition
+├── gmail_mcp.py        # Main MCP server implementation
+├── requirements.txt    # Python dependencies
+├── .env               # Environment configuration
+├── setup.sh           # Setup and management script
+└── README.md          # This file
 ```
 
 ## Dependencies
@@ -254,18 +262,55 @@ Python packages (automatically installed via Docker):
 - `PyPDF2` - PDF text extraction (optional)
 - `python-docx` - DOCX text extraction (optional)
 
+## Management Commands
+
+Using the setup script:
+
+```bash
+./setup.sh
+```
+
+Options:
+1. Start Gmail MCP Server
+2. Stop Gmail MCP Server
+3. Restart Gmail MCP Server
+4. View logs
+5. Check status
+6. Update server
+7. Clean up (remove all data)
+8. Exit
+
+Or use Docker Compose directly:
+
+```bash
+# Start server
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop server
+docker-compose down
+
+# Restart server
+docker-compose restart
+
+# Check status
+docker-compose ps
+```
+
 ## Troubleshooting
 
-### Services won't start
+### Server won't start
 
 ```bash
 # Check Docker status
 docker ps
 
 # View detailed logs
-docker-compose logs
+docker-compose logs gmail-mcp
 
-# Restart services
+# Restart server
 docker-compose restart
 ```
 
@@ -277,21 +322,20 @@ docker-compose restart
 
 ### Port conflicts
 
-If port 3000 or 11434 is already in use:
+If port 3002 is already in use:
 
-1. Edit `.env` file to change `OPENWEBUI_PORT` or `OLLAMA_PORT`
-2. Edit `docker-compose.yml` to update port mappings
-3. Restart services
+1. Edit `.env` file to change `MCP_PORT=3003`
+2. Edit `docker-compose.yml` to update port mappings: `3003:3003`
+3. Restart server
 
-### Model not found
+### OpenWebUI can't connect to MCP server
 
-```bash
-# List available models
-docker exec -it ollama ollama list
-
-# Download a model
-docker exec -it ollama ollama pull llama3.2
-```
+1. Verify the server is running: `docker-compose ps`
+2. Check logs: `docker-compose logs gmail-mcp`
+3. Ensure correct URL in OpenWebUI:
+   - Docker network: `http://gmail-mcp-server:3002`
+   - Local: `http://localhost:3002`
+4. Check firewall settings
 
 ## Development
 
@@ -310,7 +354,21 @@ python gmail_mcp.py
 
 ### Testing
 
-Test individual tools using the MCP client or through OpenWebUI interface.
+Test individual tools using any MCP client or through OpenWebUI interface.
+
+## Architecture
+
+```
+┌─────────────────┐         ┌──────────────────┐         ┌─────────────┐
+│   OpenWebUI     │◄───────►│  Gmail MCP       │◄───────►│  Gmail API  │
+│   or other      │   MCP   │  Server          │  HTTPS  │             │
+│   MCP Client    │         │  (Port 3002)     │         │             │
+└─────────────────┘         └──────────────────┘         └─────────────┘
+```
+
+The Gmail MCP Server acts as a bridge between:
+1. **MCP Clients** (OpenWebUI, Claude Desktop, etc.) - Send natural language requests
+2. **Gmail API** - Processes requests and returns email data
 
 ## Security Considerations
 
@@ -319,6 +377,7 @@ Test individual tools using the MCP client or through OpenWebUI interface.
 - Regularly rotate API credentials
 - Limit Gmail API scopes to only what's needed
 - Use environment-specific access tokens
+- Run the MCP server in a private network when possible
 
 ## Contributing
 
@@ -337,8 +396,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - Built with [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-- Uses [OpenWebUI](https://github.com/open-webui/open-webui) for the interface
-- Powered by [Ollama](https://ollama.ai/) for local LLM support
+- Compatible with [OpenWebUI](https://github.com/open-webui/open-webui)
+- Uses Gmail API for email operations
 
 ## Support
 
@@ -350,9 +409,15 @@ For issues, questions, or contributions:
 
 ## Changelog
 
+### v2.0.0
+- Refactored to standalone MCP server architecture
+- Removed bundled OpenWebUI (assumes external instance)
+- Simplified Docker setup
+- Added comprehensive connection instructions
+- Improved documentation
+
 ### v1.0.0
-- Initial release
+- Initial release with bundled OpenWebUI
 - Full Gmail integration via MCP
-- Docker deployment support
-- OpenWebUI integration
+- Email summarization feature
 - Comprehensive email management tools
