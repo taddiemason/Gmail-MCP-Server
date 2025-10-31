@@ -6,7 +6,7 @@ services:
     image: ghcr.io/open-webui/open-webui:main
     container_name: openwebui
     ports:
-      - "3002:8080"
+      - "3000:8080"
     volumes:
       # Mount the Gmail MCP server
       - ./gmail_mcp.py:/app/mcp/gmail_mcp.py:ro

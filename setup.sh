@@ -113,7 +113,7 @@ case $choice in
         if docker-compose ps | grep -q "Up"; then
             print_success "Services are running!"
             echo ""
-            print_info "OpenWebUI: http://localhost:3002"
+            print_info "OpenWebUI: http://localhost:3000"
             print_info "Ollama API: http://localhost:11434"
             echo ""
             print_warning "Don't forget to download a model!"
