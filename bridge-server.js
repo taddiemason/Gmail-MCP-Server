@@ -18,6 +18,11 @@ app.post('/v1/tools/execute', async (req, res) => {
   try {
     const { tool_name, arguments: args } = req.body;
 
+    // Log incoming request for debugging
+    console.log('=== Incoming Request ===');
+    console.log('Tool:', tool_name);
+    console.log('Arguments:', JSON.stringify(args, null, 2));
+
     if (!tool_name) {
       return res.status(400).json({ error: 'Missing tool_name' });
     }
@@ -34,17 +39,35 @@ app.post('/v1/tools/execute', async (req, res) => {
     exec(command, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
         console.error(`Error executing ${tool_name}:`, error);
+        console.error('stderr:', stderr);
+        console.error('stdout:', stdout);
         return res.status(500).json({
           error: 'Execution failed',
           details: stderr || error.message,
-          result: stdout
+          stdout: stdout,
+          stderr: stderr
         });
       }
 
+      console.log('Raw output:', stdout);
+
       try {
         const result = JSON.parse(stdout);
+
+        // Check if the result contains an error from the Python script
+        if (result.error) {
+          console.error('Tool execution error:', result);
+          return res.status(500).json({
+            error: result.error,
+            type: result.type,
+            traceback: result.traceback
+          });
+        }
+
         res.json({ result: result });
       } catch (e) {
+        console.error('JSON parse error:', e);
+        console.error('Attempted to parse:', stdout);
         // If output is not JSON, return as plain text
         res.json({ result: stdout });
       }
@@ -106,33 +129,75 @@ import sys
 import json
 from gmail_mcp import mcp
 import asyncio
+import gmail_mcp
 
 async def run():
-    # Import the tool function
-    tool_func = getattr(sys.modules['gmail_mcp'], '${mcpToolName}', None)
-    if not tool_func:
-        print(json.dumps({'error': 'Tool not found: ${mcpToolName}'}))
-        return
+    try:
+        # Import the tool function
+        tool_func = getattr(gmail_mcp, '${mcpToolName}', None)
+        if not tool_func:
+            print(json.dumps({'error': 'Tool not found: ${mcpToolName}'}))
+            sys.exit(1)
 
-    # Parse arguments
-    args = json.loads('${argsJson}')
+        # Parse arguments
+        args_dict = json.loads('${argsJson}')
 
-    # Create a mock context (simplified)
-    class MockContext:
-        def __init__(self):
-            self.request_context = type('obj', (object,), {
-                'lifespan_state': {'http_client': None}
-            })()
+        # Get the input model class name (e.g., gmail_search_messages -> GmailSearchInput)
+        # This is a mapping of tool names to their Pydantic input models
+        model_map = {
+            'gmail_search_messages': 'GmailSearchInput',
+            'gmail_get_message': 'GmailGetMessageInput',
+            'gmail_get_thread': 'GmailGetThreadInput',
+            'gmail_get_attachment_text': 'GmailGetAttachmentTextInput',
+            'gmail_summarize_emails': 'SummarizeEmailsInput',
+            'gmail_send_message': 'GmailSendInput',
+            'gmail_create_draft': 'GmailDraftInput',
+            'gmail_list_drafts': 'GmailListDraftsInput',
+            'gmail_delete_draft': 'GmailDeleteDraftInput',
+            'gmail_list_labels': 'GmailListLabelsInput',
+            'gmail_create_label': 'GmailCreateLabelInput',
+            'gmail_modify_message_labels': 'GmailModifyLabelsInput',
+            'gmail_mark_message_read': 'GmailMarkReadInput'
+        }
 
-        async def elicit(self, prompt, input_type='text'):
-            import os
-            return os.getenv('GMAIL_ACCESS_TOKEN', '')
+        model_class_name = model_map.get('${mcpToolName}')
+        if model_class_name:
+            # Get the Pydantic model class and instantiate it with the arguments
+            model_class = getattr(gmail_mcp, model_class_name, None)
+            if model_class:
+                params = model_class(**args_dict)
+            else:
+                # Fallback to dict if model class not found
+                params = args_dict
+        else:
+            # Use dict directly for tools without specific models
+            params = args_dict
 
-    ctx = MockContext()
+        # Create a mock context
+        class MockContext:
+            def __init__(self):
+                self.request_context = type('obj', (object,), {
+                    'lifespan_state': {'http_client': None}
+                })()
 
-    # Execute the tool
-    result = await tool_func(args, ctx)
-    print(json.dumps({'output': result}))
+            async def elicit(self, prompt, input_type='text'):
+                import os
+                return os.getenv('GMAIL_ACCESS_TOKEN', '')
+
+        ctx = MockContext()
+
+        # Execute the tool
+        result = await tool_func(params, ctx)
+        print(json.dumps({'output': result}))
+
+    except Exception as e:
+        import traceback
+        print(json.dumps({
+            'error': str(e),
+            'type': type(e).__name__,
+            'traceback': traceback.format_exc()
+        }))
+        sys.exit(1)
 
 asyncio.run(run())
 "`;
