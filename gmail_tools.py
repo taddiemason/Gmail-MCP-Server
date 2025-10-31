@@ -14,7 +14,7 @@ from typing import Optional
 class Tools:
     class Valves(BaseModel):
         bridge_url: str = Field(
-            default="http://localhost:3001",
+            default="http://localhost:3002",
             description="URL of the Gmail MCP bridge server"
         )
         timeout: int = Field(

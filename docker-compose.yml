@@ -28,13 +28,13 @@ services:
     restart: unless-stopped
     user: "0:0"
     ports:
-      - "${MCP_PORT:-3001}:3001"
+      - "${MCP_PORT:-3002}:3002"
     depends_on:
       - gmail-mcp-server
     networks:
       - gmail-network
     environment:
-      - PORT=3001
+      - PORT=3002
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     privileged: true

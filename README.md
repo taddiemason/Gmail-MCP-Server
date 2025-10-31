@@ -14,7 +14,7 @@ The Gmail MCP Server consists of two components:
 ```
 ┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐         ┌─────────────┐
 │   OpenWebUI     │◄───────►│  MCP Bridge      │◄───────►│  Gmail MCP      │◄───────►│  Gmail API  │
-│   Tools         │   HTTP  │  (Port 3001)     │  Docker │  Server         │  HTTPS  │             │
+│   Tools         │   HTTP  │  (Port 3002)     │  Docker │  Server         │  HTTPS  │             │
 └─────────────────┘         └──────────────────┘         └─────────────────┘         └─────────────┘
 ```
 
@@ -85,8 +85,8 @@ Edit the `.env` file:
 # Gmail API Access Token (required)
 GMAIL_ACCESS_TOKEN=your_gmail_access_token_here
 
-# MCP Bridge Server Port (default: 3001)
-MCP_PORT=3001
+# MCP Bridge Server Port (default: 3002)
+MCP_PORT=3002
 
 # Log level (DEBUG, INFO, WARNING, ERROR)
 LOG_LEVEL=INFO
@@ -111,7 +111,7 @@ Or manually with Docker Compose:
 docker-compose up -d --build
 ```
 
-The Gmail MCP Bridge will be available at: **http://localhost:3001**
+The Gmail MCP Bridge will be available at: **http://localhost:3002**
 
 ### 5. Add Tool to OpenWebUI
 
@@ -121,8 +121,8 @@ The Gmail MCP Bridge will be available at: **http://localhost:3001**
 4. **Copy the contents** of `gmail_tools.py` from this repository
 5. **Paste** into the tool editor
 6. **Configure the bridge URL** in the Valves section:
-   - If OpenWebUI is in Docker: `http://gmail-mcp-bridge:3001`
-   - If OpenWebUI is local: `http://localhost:3001`
+   - If OpenWebUI is in Docker: `http://gmail-mcp-bridge:3002`
+   - If OpenWebUI is local: `http://localhost:3002`
 7. Click **"Save"**
 8. **Enable** the Gmail Tools
 
@@ -131,7 +131,7 @@ The Gmail MCP Bridge will be available at: **http://localhost:3001**
 Test the health endpoint:
 
 ```bash
-curl http://localhost:3001/health
+curl http://localhost:3002/health
 ```
 
 Expected response:
@@ -206,16 +206,16 @@ The AI will automatically call the appropriate Gmail tool functions to complete 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GMAIL_ACCESS_TOKEN` | Gmail API access token (required) | - |
-| `MCP_PORT` | Port for MCP bridge server | 3001 |
+| `MCP_PORT` | Port for MCP bridge server | 3002 |
 | `LOG_LEVEL` | Logging level | INFO |
 
 ### Bridge URL Configuration
 
 In OpenWebUI's Gmail Tools Valves settings:
 
-- **Docker network**: `http://gmail-mcp-bridge:3001` (if OpenWebUI container is on same network)
-- **Local**: `http://localhost:3001` (if OpenWebUI runs outside Docker)
-- **Remote**: `http://YOUR_SERVER_IP:3001` (if bridge is on different host)
+- **Docker network**: `http://gmail-mcp-bridge:3002` (if OpenWebUI container is on same network)
+- **Local**: `http://localhost:3002` (if OpenWebUI runs outside Docker)
+- **Remote**: `http://YOUR_SERVER_IP:3002` (if bridge is on different host)
 
 ## File Structure
 
@@ -299,10 +299,10 @@ docker-compose restart
 
 ### Port conflicts
 
-If port 3001 is already in use:
+If port 3002 is already in use:
 
-1. Edit `.env` file: `MCP_PORT=3002`
-2. Edit `docker-compose.yml`: Update port mapping to `3002:3001`
+1. Edit `.env` file: `MCP_PORT=3003`
+2. Edit `docker-compose.yml`: Update port mapping to `3003:3003` and environment `PORT=3003`
 3. Restart: `docker-compose down && docker-compose up -d --build`
 4. Update bridge URL in OpenWebUI Tool Valves
 
@@ -310,11 +310,11 @@ If port 3001 is already in use:
 
 1. **Verify bridge is running**: `docker-compose ps`
 2. **Check bridge logs**: `docker-compose logs mcp-bridge`
-3. **Test health endpoint**: `curl http://localhost:3001/health`
+3. **Test health endpoint**: `curl http://localhost:3002/health`
 4. **Check bridge URL** in OpenWebUI Tool Valves settings:
-   - If both in Docker on same network: `http://gmail-mcp-bridge:3001`
-   - If OpenWebUI is local: `http://localhost:3001`
-   - If on different hosts: `http://SERVER_IP:3001`
+   - If both in Docker on same network: `http://gmail-mcp-bridge:3002`
+   - If OpenWebUI is local: `http://localhost:3002`
+   - If on different hosts: `http://SERVER_IP:3002`
 5. **Connect Docker networks** if needed:
    ```bash
    docker network connect openwebui_network gmail-mcp-bridge
@@ -358,7 +358,7 @@ python gmail_mcp.py
 **Bridge Server:**
 ```bash
 npm install express cors
-export PORT=3001
+export PORT=3002
 node bridge-server.js
 ```
 
@@ -366,10 +366,10 @@ node bridge-server.js
 
 ```bash
 # Health check
-curl http://localhost:3001/health
+curl http://localhost:3002/health
 
 # Test search
-curl -X POST http://localhost:3001/v1/tools/execute \
+curl -X POST http://localhost:3002/v1/tools/execute \
   -H "Content-Type: application/json" \
   -d '{
     "tool_name": "gmail_search_messages",
