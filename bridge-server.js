@@ -60,25 +60,44 @@ app.post('/v1/tools/execute', async (req, res) => {
 function buildMCPCommand(toolName, args) {
   const argsJson = JSON.stringify(args || {}).replace(/"/g, '\\"');
 
-  // Map tool names to MCP commands
+  // Strip "gmail/" prefix if present
+  const cleanToolName = toolName.replace(/^gmail\//, '');
+
+  // Map tool names from OpenWebUI to MCP function names
   const toolMap = {
-    'gmail_search_messages': 'search_messages',
-    'gmail_get_message': 'get_message',
-    'gmail_get_thread': 'get_thread',
-    'gmail_get_attachment_text': 'get_attachment_text',
-    'gmail_summarize_emails': 'summarize_emails',
-    'gmail_send_message': 'send_message',
-    'gmail_create_draft': 'create_draft',
-    'gmail_list_drafts': 'list_drafts',
-    'gmail_delete_draft': 'delete_draft',
-    'gmail_list_labels': 'list_labels',
-    'gmail_create_label': 'create_label',
-    'gmail_modify_message_labels': 'modify_message_labels',
-    'gmail_mark_message_read': 'mark_message_read'
+    // Format from OpenWebUI Tools (gmail_tools.py)
+    'search_emails': 'gmail_search_messages',
+    'get_email': 'gmail_get_message',
+    'get_thread': 'gmail_get_thread',
+    'get_attachment_text': 'gmail_get_attachment_text',
+    'summarize_emails': 'gmail_summarize_emails',
+    'send_email': 'gmail_send_message',
+    'create_draft': 'gmail_create_draft',
+    'list_drafts': 'gmail_list_drafts',
+    'delete_draft': 'gmail_delete_draft',
+    'list_labels': 'gmail_list_labels',
+    'create_label': 'gmail_create_label',
+    'modify_labels': 'gmail_modify_message_labels',
+    'mark_read': 'gmail_mark_message_read',
+    // Also support direct MCP names
+    'gmail_search_messages': 'gmail_search_messages',
+    'gmail_get_message': 'gmail_get_message',
+    'gmail_get_thread': 'gmail_get_thread',
+    'gmail_get_attachment_text': 'gmail_get_attachment_text',
+    'gmail_summarize_emails': 'gmail_summarize_emails',
+    'gmail_send_message': 'gmail_send_message',
+    'gmail_create_draft': 'gmail_create_draft',
+    'gmail_list_drafts': 'gmail_list_drafts',
+    'gmail_delete_draft': 'gmail_delete_draft',
+    'gmail_list_labels': 'gmail_list_labels',
+    'gmail_create_label': 'gmail_create_label',
+    'gmail_modify_message_labels': 'gmail_modify_message_labels',
+    'gmail_mark_message_read': 'gmail_mark_message_read'
   };
 
-  const mcpTool = toolMap[toolName];
-  if (!mcpTool) {
+  const mcpToolName = toolMap[cleanToolName];
+  if (!mcpToolName) {
+    console.error(`Unknown tool: ${toolName} (cleaned: ${cleanToolName})`);
     return null;
   }
 
@@ -90,9 +109,9 @@ import asyncio
 
 async def run():
     # Import the tool function
-    tool_func = getattr(sys.modules['gmail_mcp'], 'gmail_${mcpTool}', None)
+    tool_func = getattr(sys.modules['gmail_mcp'], '${mcpToolName}', None)
     if not tool_func:
-        print(json.dumps({'error': 'Tool not found'}))
+        print(json.dumps({'error': 'Tool not found: ${mcpToolName}'}))
         return
 
     # Parse arguments
