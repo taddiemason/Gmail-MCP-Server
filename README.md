@@ -8,6 +8,7 @@ Gmail MCP Server provides a complete set of tools for AI assistants to interact 
 
 - **Email Search**: Search emails using keywords, sender names, date ranges, and Gmail operators
 - **Email Reading**: Read email content and view conversation threads
+- **Email Summarization**: AI-powered summarization of multiple emails at once
 - **Attachment Handling**: Download and extract text from attachments (PDF, DOCX, TXT)
 - **Email Composition**: Send new emails with AI assistance
 - **Draft Management**: Create, list, and manage email drafts
@@ -21,6 +22,12 @@ Gmail MCP Server provides a complete set of tools for AI assistants to interact 
 - Retrieve complete message content with headers and body
 - View entire conversation threads
 - Extract attachment information
+
+### Email Summarization
+- Summarize multiple emails at once using AI
+- Filter emails by search query for targeted summaries
+- Support for unread emails, date ranges, and specific senders
+- Configurable detail level (with or without full body content)
 
 ### Email Composition
 - Send emails with support for To, CC, and BCC
@@ -146,6 +153,10 @@ The Gmail MCP Server provides the following tools:
 - **gmail_get_thread**: Get entire conversation thread
 - **gmail_get_attachment_text**: Extract text from attachments
 
+### Summarization
+
+- **gmail_summarize_emails**: Fetch and format multiple emails for AI summarization
+
 ### Compose & Send
 
 - **gmail_send_message**: Send new email or reply to thread
@@ -190,6 +201,16 @@ Search for all emails from john@example.com
 
 ```
 Show me the content of message ID abc123
+```
+
+### Summarize emails
+
+```
+Summarize my unread emails from today
+```
+
+```
+Give me a summary of all emails from john@example.com this week
 ```
 
 ### Send an email
