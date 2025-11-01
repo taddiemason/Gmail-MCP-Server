@@ -36,7 +36,16 @@ app.post('/v1/tools/execute', async (req, res) => {
 
     console.log(`Executing: ${tool_name}`);
 
-    exec(command, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+    // Pass arguments as environment variable to avoid shell escaping issues
+    const execOptions = {
+      maxBuffer: 10 * 1024 * 1024,
+      env: {
+        ...process.env,
+        MCP_TOOL_ARGS: JSON.stringify(args || {})
+      }
+    };
+
+    exec(command, execOptions, (error, stdout, stderr) => {
       if (error) {
         console.error(`Error executing ${tool_name}:`, error);
         console.error('stderr:', stderr);
@@ -81,11 +90,6 @@ app.post('/v1/tools/execute', async (req, res) => {
 
 // Build the Docker exec command based on tool name and arguments
 function buildMCPCommand(toolName, args) {
-  // Escape JSON for shell - backslash before double quotes
-  const argsJson = JSON.stringify(args || {})
-    .replace(/\\/g, '\\\\')   // Escape backslashes: \ -> \\
-    .replace(/"/g, '\\"');     // Escape double quotes: " -> \"
-
   // Strip "gmail/" prefix if present
   const cleanToolName = toolName.replace(/^gmail\//, '');
 
@@ -127,7 +131,7 @@ function buildMCPCommand(toolName, args) {
     return null;
   }
 
-  return `docker exec gmail-mcp-server python -c "
+  return `docker exec -e MCP_TOOL_ARGS gmail-mcp-server python -c "
 import sys
 import json
 from gmail_mcp import mcp
@@ -142,8 +146,10 @@ async def run():
             print(json.dumps({'error': 'Tool not found: ${mcpToolName}'}))
             sys.exit(1)
 
-        # Parse arguments - JSON is shell-escaped
-        args_dict = json.loads("${argsJson}")
+        # Parse arguments from environment variable (avoids shell escaping issues)
+        import os
+        args_json = os.environ.get('MCP_TOOL_ARGS', '{}')
+        args_dict = json.loads(args_json)
 
         # Get the input model class name (e.g., gmail_search_messages -> GmailSearchInput)
         # This is a mapping of tool names to their Pydantic input models
