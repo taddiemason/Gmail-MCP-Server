@@ -106,12 +106,37 @@ cd Gmail-MCP-Server
 4. Exchange authorization code for tokens
 5. Copy the **Access Token**
 
-### 3. Configure Environment
+### 3. Configure Credentials
+
+You have **two options** for providing your Gmail API access token:
+
+#### Option A: Using credentials.json (Recommended)
+
+Create a `credentials.json` file in the project root:
+
+```bash
+cp credentials.json.example credentials.json
+```
+
+Edit `credentials.json`:
+
+```json
+{
+  "access_token": "your_gmail_access_token_here"
+}
+```
+
+**Important**:
+- Replace `your_gmail_access_token_here` with your actual Gmail API access token
+- This file is in `.gitignore` and won't be committed
+- Takes priority over environment variables
+
+#### Option B: Using Environment Variables
 
 Edit the `.env` file:
 
 ```bash
-# Gmail API Access Token (required)
+# Gmail API Access Token (required if not using credentials.json)
 GMAIL_ACCESS_TOKEN=your_gmail_access_token_here
 
 # MCP Bridge Server Port (default: 3002)
@@ -121,7 +146,7 @@ MCP_PORT=3002
 LOG_LEVEL=INFO
 ```
 
-**Important**: Replace `your_gmail_access_token_here` with your actual Gmail API access token.
+**Note**: If both `credentials.json` and `GMAIL_ACCESS_TOKEN` are present, `credentials.json` takes priority.
 
 ### 4. Start the MCP Server
 

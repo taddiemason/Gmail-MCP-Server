@@ -17,6 +17,8 @@ import base64
 import io
 import os
 import re
+import os
+from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -37,6 +39,36 @@ class ResponseFormat(str, Enum):
     """Output format for tool responses."""
     MARKDOWN = "markdown"
     JSON = "json"
+
+
+# Helper function to load Gmail credentials
+def load_gmail_credentials() -> Optional[str]:
+    """
+    Load Gmail access token from credentials.json or environment variable.
+
+    Priority order:
+    1. ./credentials.json file
+    2. GMAIL_ACCESS_TOKEN environment variable
+
+    Returns:
+        Access token string or None if not found
+    """
+    # Try reading from credentials.json first
+    creds_file = Path("credentials.json")
+    if creds_file.exists():
+        try:
+            with open(creds_file, 'r') as f:
+                creds = json.load(f)
+                # Support both simple and full OAuth credential formats
+                if "access_token" in creds:
+                    return creds["access_token"]
+                elif "token" in creds:
+                    return creds["token"]
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Warning: Could not read credentials.json: {e}")
+
+    # Fall back to environment variable
+    return os.getenv("GMAIL_ACCESS_TOKEN")
 
 
 # Lifespan management for persistent HTTP client
@@ -85,17 +117,27 @@ def truncate_response(content: str, metadata: Dict[str, Any] = None) -> str:
 
 
 async def _resolve_access_token(ctx: Context) -> str:
-    """Resolve a Gmail access token from environment or interactive prompt."""
-    token = os.getenv("GMAIL_ACCESS_TOKEN", "").strip()
+    """
+    Resolve a Gmail access token from credentials.json, environment, or interactive prompt.
 
+    Priority order:
+    1. credentials.json file
+    2. GMAIL_ACCESS_TOKEN environment variable
+    3. Interactive prompt (if supported by MCP client)
+    """
     placeholder_values = {
         "",  # empty string
         "your_gmail_access_token_here",
     }
 
+    # First try to load from credentials.json
+    token = load_gmail_credentials() or ""
+    token = token.strip()
+
     if token.lower() in placeholder_values:
         token = ""
 
+    # If still no token, try interactive prompt
     if not token:
         token = (await ctx.elicit(
             prompt="Please provide your Gmail API access token:",
@@ -106,8 +148,10 @@ async def _resolve_access_token(ctx: Context) -> str:
 
     if not token:
         raise ValueError(
-            "No Gmail access token configured. Set the GMAIL_ACCESS_TOKEN environment "
-            "variable or provide a token when prompted."
+            "No Gmail access token configured. Please either:\n"
+            "1. Create a credentials.json file with your access_token, or\n"
+            "2. Set the GMAIL_ACCESS_TOKEN environment variable, or\n"
+            "3. Provide a token when prompted."
         )
 
     return token
