@@ -16,6 +16,8 @@ import json
 import base64
 import io
 import re
+import os
+from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -36,6 +38,36 @@ class ResponseFormat(str, Enum):
     """Output format for tool responses."""
     MARKDOWN = "markdown"
     JSON = "json"
+
+
+# Helper function to load Gmail credentials
+def load_gmail_credentials() -> Optional[str]:
+    """
+    Load Gmail access token from credentials.json or environment variable.
+
+    Priority order:
+    1. ./credentials.json file
+    2. GMAIL_ACCESS_TOKEN environment variable
+
+    Returns:
+        Access token string or None if not found
+    """
+    # Try reading from credentials.json first
+    creds_file = Path("credentials.json")
+    if creds_file.exists():
+        try:
+            with open(creds_file, 'r') as f:
+                creds = json.load(f)
+                # Support both simple and full OAuth credential formats
+                if "access_token" in creds:
+                    return creds["access_token"]
+                elif "token" in creds:
+                    return creds["token"]
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Warning: Could not read credentials.json: {e}")
+
+    # Fall back to environment variable
+    return os.getenv("GMAIL_ACCESS_TOKEN")
 
 
 # Lifespan management for persistent HTTP client
@@ -106,13 +138,16 @@ async def make_gmail_request(
         httpx.HTTPStatusError: On API errors with helpful messages
     """
     client = ctx.request_context.lifespan_state["http_client"]
-    
-    # Get access token - in production, this would come from OAuth flow
-    # For now, we'll request it interactively when needed
-    access_token = await ctx.elicit(
-        prompt="Please provide your Gmail API access token:",
-        input_type="password"
-    )
+
+    # Get access token from credentials.json or environment variable
+    access_token = load_gmail_credentials()
+
+    # If not found, fall back to interactive prompt (for MCP clients that support it)
+    if not access_token:
+        access_token = await ctx.elicit(
+            prompt="Please provide your Gmail API access token:",
+            input_type="password"
+        )
     
     headers = {
         "Authorization": f"Bearer {access_token}",

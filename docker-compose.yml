@@ -15,6 +15,8 @@ services:
     volumes:
       - ./gmail_mcp.py:/app/gmail_mcp.py:ro
       - ./requirements.txt:/app/requirements.txt:ro
+      # Mount credentials.json if it exists (takes priority over env var)
+      - ./credentials.json:/app/credentials.json:ro
     networks:
       - gmail-network
     stdin_open: true
