@@ -8,8 +8,12 @@ services:
     container_name: gmail-mcp-server
     restart: unless-stopped
     environment:
-      # Gmail API Access Token
-      - GMAIL_ACCESS_TOKEN=${GMAIL_ACCESS_TOKEN}
+      # Gmail API - Full OAuth (recommended)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REFRESH_TOKEN=${GOOGLE_REFRESH_TOKEN:-}
+      # Gmail API - Simple access token (expires in 1 hour)
+      - GMAIL_ACCESS_TOKEN=${GMAIL_ACCESS_TOKEN:-}
       # Optional: Log level
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:

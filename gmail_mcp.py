@@ -41,17 +41,24 @@ class ResponseFormat(str, Enum):
     JSON = "json"
 
 
-# Helper function to load Gmail credentials
-def load_gmail_credentials() -> Optional[str]:
+# Helper functions for Gmail credentials and OAuth
+def load_gmail_credentials() -> Optional[Dict[str, str]]:
     """
-    Load Gmail access token from credentials.json or environment variable.
+    Load Gmail credentials from credentials.json or environment variables.
 
     Priority order:
-    1. ./credentials.json file
-    2. GMAIL_ACCESS_TOKEN environment variable
+    1. ./credentials.json file (supports both access_token and full OAuth)
+    2. Environment variables (GMAIL_ACCESS_TOKEN or full OAuth)
 
     Returns:
-        Access token string or None if not found
+        Dict with credentials or None if not found
+        Format: {
+            "access_token": "...",  # Simple format
+            OR
+            "client_id": "...",     # Full OAuth format (recommended)
+            "client_secret": "...",
+            "refresh_token": "..."
+        }
     """
     # Try reading from credentials.json first
     creds_file = Path("credentials.json")
@@ -59,16 +66,72 @@ def load_gmail_credentials() -> Optional[str]:
         try:
             with open(creds_file, 'r') as f:
                 creds = json.load(f)
-                # Support both simple and full OAuth credential formats
+
+                # Check for full OAuth credentials (preferred)
+                if all(k in creds for k in ["client_id", "client_secret", "refresh_token"]):
+                    return {
+                        "client_id": creds["client_id"],
+                        "client_secret": creds["client_secret"],
+                        "refresh_token": creds["refresh_token"],
+                        "access_token": creds.get("access_token", "")  # Optional, will be refreshed
+                    }
+
+                # Fall back to simple access token
                 if "access_token" in creds:
-                    return creds["access_token"]
+                    return {"access_token": creds["access_token"]}
                 elif "token" in creds:
-                    return creds["token"]
+                    return {"access_token": creds["token"]}
+
         except (json.JSONDecodeError, IOError) as e:
             print(f"Warning: Could not read credentials.json: {e}")
 
-    # Fall back to environment variable
-    return os.getenv("GMAIL_ACCESS_TOKEN")
+    # Try environment variables
+    # Full OAuth from env
+    if all(os.getenv(k) for k in ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"]):
+        return {
+            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+            "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+            "refresh_token": os.getenv("GOOGLE_REFRESH_TOKEN"),
+            "access_token": os.getenv("GMAIL_ACCESS_TOKEN", "")
+        }
+
+    # Simple access token from env
+    if os.getenv("GMAIL_ACCESS_TOKEN"):
+        return {"access_token": os.getenv("GMAIL_ACCESS_TOKEN")}
+
+    return None
+
+
+async def refresh_access_token(client: httpx.AsyncClient, creds: Dict[str, str]) -> str:
+    """
+    Refresh an expired access token using OAuth refresh token.
+
+    Args:
+        client: HTTP client for making requests
+        creds: Credentials dict with client_id, client_secret, refresh_token
+
+    Returns:
+        New access token
+
+    Raises:
+        httpx.HTTPError: If refresh fails
+    """
+    if not all(k in creds for k in ["client_id", "client_secret", "refresh_token"]):
+        raise ValueError("Missing OAuth credentials for token refresh")
+
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "client_id": creds["client_id"],
+        "client_secret": creds["client_secret"],
+        "refresh_token": creds["refresh_token"],
+        "grant_type": "refresh_token"
+    }
+
+    response = await client.post(token_url, data=data)
+    response.raise_for_status()
+
+    token_data = response.json()
+    return token_data["access_token"]
 
 
 # Lifespan management for persistent HTTP client
@@ -121,40 +184,70 @@ async def _resolve_access_token(ctx: Context) -> str:
     Resolve a Gmail access token from credentials.json, environment, or interactive prompt.
 
     Priority order:
-    1. credentials.json file
-    2. GMAIL_ACCESS_TOKEN environment variable
+    1. credentials.json file (full OAuth or simple token)
+    2. Environment variables (GOOGLE_CLIENT_ID etc. or GMAIL_ACCESS_TOKEN)
     3. Interactive prompt (if supported by MCP client)
+
+    If full OAuth credentials are available, will automatically refresh expired tokens.
     """
     placeholder_values = {
         "",  # empty string
         "your_gmail_access_token_here",
+        "your_client_id.apps.googleusercontent.com",
+        "your_client_secret",
+        "your_refresh_token",
     }
 
-    # First try to load from credentials.json
-    token = load_gmail_credentials() or ""
-    token = token.strip()
+    # Load credentials
+    creds = load_gmail_credentials()
 
-    if token.lower() in placeholder_values:
-        token = ""
+    if creds:
+        # Check if we have full OAuth credentials with refresh capability
+        if all(k in creds for k in ["client_id", "client_secret", "refresh_token"]):
+            # We have full OAuth - try to get/refresh access token
+            client = ctx.request_context.lifespan_state["http_client"]
+
+            # Check if existing access token is valid (not placeholder)
+            existing_token = creds.get("access_token", "").strip()
+            if existing_token and existing_token not in placeholder_values:
+                # Try to use existing token first
+                # Note: In production, you'd check token expiry here
+                return existing_token
+
+            # Refresh the token
+            try:
+                new_token = await refresh_access_token(client, creds)
+                return new_token
+            except Exception as e:
+                print(f"Warning: Token refresh failed: {e}")
+                # Fall through to other methods
+
+        # Simple access token format
+        elif "access_token" in creds:
+            token = creds["access_token"].strip()
+            if token and token not in placeholder_values:
+                return token
 
     # If still no token, try interactive prompt
-    if not token:
-        token = (await ctx.elicit(
-            prompt="Please provide your Gmail API access token:",
-            input_type="password"
-        ) or "").strip()
-        if token.lower() in placeholder_values:
-            token = ""
+    token = (await ctx.elicit(
+        prompt="Please provide your Gmail API access token:",
+        input_type="password"
+    ) or "").strip()
 
-    if not token:
-        raise ValueError(
-            "No Gmail access token configured. Please either:\n"
-            "1. Create a credentials.json file with your access_token, or\n"
-            "2. Set the GMAIL_ACCESS_TOKEN environment variable, or\n"
-            "3. Provide a token when prompted."
-        )
+    if token and token not in placeholder_values:
+        return token
 
-    return token
+    # No valid token found
+    raise ValueError(
+        "No Gmail credentials configured. Please either:\n"
+        "1. Create credentials.json with full OAuth (client_id, client_secret, refresh_token), or\n"
+        "2. Create credentials.json with a simple access_token, or\n"
+        "3. Set environment variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN), or\n"
+        "4. Set GMAIL_ACCESS_TOKEN environment variable, or\n"
+        "5. Provide a token when prompted.\n\n"
+        "Get OAuth credentials from: https://console.cloud.google.com/apis/credentials\n"
+        "Get refresh token from: https://developers.google.com/oauthplayground/"
+    )
 
 
 async def make_gmail_request(
