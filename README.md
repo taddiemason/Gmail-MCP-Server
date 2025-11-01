@@ -96,19 +96,64 @@ cd Gmail-MCP-Server
 
 ### 2. Get Gmail API Credentials
 
+You need Gmail API credentials to authenticate. There are **two approaches**:
+
+#### Approach A: Full OAuth (Recommended - Never Expires)
+
+This is the production-ready approach with auto-refreshing tokens.
+
+**Step 1: Create OAuth Credentials**
+
+1. Go to [Google Cloud Console - APIs & Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create a new project or select an existing one
+3. Click **"+ CREATE CREDENTIALS"** → **"OAuth client ID"**
+4. If prompted, configure the OAuth consent screen:
+   - User Type: **External** (unless you have a Google Workspace)
+   - Add your email as a test user
+   - Scopes: Add Gmail scopes (you'll configure in OAuth Playground)
+5. Application type: **Web application**
+6. Name: `Gmail MCP Server`
+7. Authorized redirect URIs: `https://developers.google.com/oauthplayground`
+8. Click **Create** and save your:
+   - **Client ID** (ends with `.apps.googleusercontent.com`)
+   - **Client Secret**
+
+**Step 2: Get Refresh Token**
+
 1. Visit [Google OAuth Playground](https://developers.google.com/oauthplayground/)
-2. Select **Gmail API v1** scopes:
+2. Click the **⚙️ gear icon** (top right) → OAuth 2.0 configuration
+3. Check **"Use your own OAuth credentials"**
+4. Enter your **Client ID** and **Client Secret**
+5. On the left, select **Gmail API v1** scopes:
    - `https://www.googleapis.com/auth/gmail.readonly`
    - `https://www.googleapis.com/auth/gmail.send`
    - `https://www.googleapis.com/auth/gmail.modify`
    - `https://www.googleapis.com/auth/gmail.labels`
-3. Click "Authorize APIs"
+6. Click **"Authorize APIs"**
+7. Sign in with your Gmail account and grant permissions
+8. Click **"Exchange authorization code for tokens"**
+9. Save your **Refresh Token** (starts with `1//`)
+
+**You now have all three credentials:**
+- ✅ Client ID
+- ✅ Client Secret
+- ✅ Refresh Token
+
+#### Approach B: Simple Access Token (Quick Start - Expires in 1 Hour)
+
+For testing only. Tokens expire in 1 hour.
+
+1. Visit [Google OAuth Playground](https://developers.google.com/oauthplayground/)
+2. Select **Gmail API v1** scopes (same as above)
+3. Click **"Authorize APIs"**
 4. Exchange authorization code for tokens
-5. Copy the **Access Token**
+5. Copy the **Access Token** (starts with `ya29.`)
+
+⚠️ **Warning**: This token expires quickly. Use Approach A for production.
 
 ### 3. Configure Credentials
 
-You have **two options** for providing your Gmail API access token:
+You have **two options** for providing your credentials:
 
 #### Option A: Using credentials.json (Recommended)
 
@@ -118,26 +163,42 @@ Create a `credentials.json` file in the project root:
 cp credentials.json.example credentials.json
 ```
 
-Edit `credentials.json`:
+**For Full OAuth (Approach A from Step 2):**
+
+Edit `credentials.json` with your OAuth credentials:
 
 ```json
 {
-  "access_token": "your_gmail_access_token_here"
+  "client_id": "your_client_id.apps.googleusercontent.com",
+  "client_secret": "your_client_secret",
+  "refresh_token": "1//your_refresh_token"
+}
+```
+
+**For Simple Access Token (Approach B from Step 2):**
+
+```json
+{
+  "access_token": "ya29.your_access_token"
 }
 ```
 
 **Important**:
-- Replace `your_gmail_access_token_here` with your actual Gmail API access token
 - This file is in `.gitignore` and won't be committed
 - Takes priority over environment variables
+- Full OAuth credentials will auto-refresh, never expire
 
 #### Option B: Using Environment Variables
 
 Edit the `.env` file:
 
+**For Full OAuth:**
+
 ```bash
-# Gmail API Access Token (required if not using credentials.json)
-GMAIL_ACCESS_TOKEN=your_gmail_access_token_here
+# Recommended: Full OAuth credentials (never expire)
+GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_client_secret
+GOOGLE_REFRESH_TOKEN=1//your_refresh_token
 
 # MCP Bridge Server Port (default: 3002)
 MCP_PORT=3002
@@ -146,7 +207,20 @@ MCP_PORT=3002
 LOG_LEVEL=INFO
 ```
 
-**Note**: If both `credentials.json` and `GMAIL_ACCESS_TOKEN` are present, `credentials.json` takes priority.
+**For Simple Access Token:**
+
+```bash
+# Quick start: Simple access token (expires in 1 hour)
+GMAIL_ACCESS_TOKEN=ya29.your_access_token
+
+# MCP Bridge Server Port (default: 3002)
+MCP_PORT=3002
+
+# Log level (DEBUG, INFO, WARNING, ERROR)
+LOG_LEVEL=INFO
+```
+
+**Note**: If both `credentials.json` and environment variables are present, `credentials.json` takes priority.
 
 ### 4. Start the MCP Server
 
