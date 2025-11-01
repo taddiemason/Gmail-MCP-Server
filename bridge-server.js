@@ -81,7 +81,12 @@ app.post('/v1/tools/execute', async (req, res) => {
 
 // Build the Docker exec command based on tool name and arguments
 function buildMCPCommand(toolName, args) {
-  const argsJson = JSON.stringify(args || {}).replace(/"/g, '\\"');
+  // Properly escape JSON for embedding in Python single-quoted string
+  const argsJson = JSON.stringify(args || {})
+    .replace(/\\/g, '\\\\')  // Escape backslashes first (\ -> \\)
+    .replace(/'/g, "\\'");    // Escape single quotes (' -> \')
+
+  // Note: We use single quotes in Python, so we escape single quotes not double quotes
 
   // Strip "gmail/" prefix if present
   const cleanToolName = toolName.replace(/^gmail\//, '');
