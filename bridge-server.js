@@ -173,22 +173,32 @@ async def run():
             # Use dict directly for tools without specific models
             params = args_dict
 
-        # Create a mock context
+        # Create a mock context with a real HTTP client
+        import httpx
+
         class MockContext:
             def __init__(self):
+                self.http_client = httpx.AsyncClient(timeout=30.0)
                 self.request_context = type('obj', (object,), {
-                    'lifespan_state': {'http_client': None}
+                    'lifespan_state': {'http_client': self.http_client}
                 })()
 
             async def elicit(self, prompt, input_type='text'):
                 import os
                 return os.getenv('GMAIL_ACCESS_TOKEN', '')
 
+            async def cleanup(self):
+                await self.http_client.aclose()
+
         ctx = MockContext()
 
         # Execute the tool
-        result = await tool_func(params, ctx)
-        print(json.dumps({'output': result}))
+        try:
+            result = await tool_func(params, ctx)
+            print(json.dumps({'output': result}))
+        finally:
+            # Clean up the HTTP client
+            await ctx.cleanup()
 
     except Exception as e:
         import traceback
