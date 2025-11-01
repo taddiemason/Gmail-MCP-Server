@@ -15,6 +15,7 @@ This server follows MCP best practices for tool design, response formatting, and
 import json
 import base64
 import io
+import os
 import re
 import os
 from pathlib import Path
@@ -115,6 +116,47 @@ def truncate_response(content: str, metadata: Dict[str, Any] = None) -> str:
     return truncated + truncation_msg
 
 
+async def _resolve_access_token(ctx: Context) -> str:
+    """
+    Resolve a Gmail access token from credentials.json, environment, or interactive prompt.
+
+    Priority order:
+    1. credentials.json file
+    2. GMAIL_ACCESS_TOKEN environment variable
+    3. Interactive prompt (if supported by MCP client)
+    """
+    placeholder_values = {
+        "",  # empty string
+        "your_gmail_access_token_here",
+    }
+
+    # First try to load from credentials.json
+    token = load_gmail_credentials() or ""
+    token = token.strip()
+
+    if token.lower() in placeholder_values:
+        token = ""
+
+    # If still no token, try interactive prompt
+    if not token:
+        token = (await ctx.elicit(
+            prompt="Please provide your Gmail API access token:",
+            input_type="password"
+        ) or "").strip()
+        if token.lower() in placeholder_values:
+            token = ""
+
+    if not token:
+        raise ValueError(
+            "No Gmail access token configured. Please either:\n"
+            "1. Create a credentials.json file with your access_token, or\n"
+            "2. Set the GMAIL_ACCESS_TOKEN environment variable, or\n"
+            "3. Provide a token when prompted."
+        )
+
+    return token
+
+
 async def make_gmail_request(
     ctx: Context,
     method: str,
@@ -123,32 +165,24 @@ async def make_gmail_request(
     json_data: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Make authenticated request to Gmail API.
-    
+
     Args:
         ctx: Context containing HTTP client and auth
         method: HTTP method (GET, POST, PUT, DELETE)
         endpoint: API endpoint (without base URL)
         params: Query parameters
         json_data: JSON request body
-        
+
     Returns:
         API response as dictionary
-        
+
     Raises:
         httpx.HTTPStatusError: On API errors with helpful messages
     """
     client = ctx.request_context.lifespan_state["http_client"]
 
-    # Get access token from credentials.json or environment variable
-    access_token = load_gmail_credentials()
+    access_token = await _resolve_access_token(ctx)
 
-    # If not found, fall back to interactive prompt (for MCP clients that support it)
-    if not access_token:
-        access_token = await ctx.elicit(
-            prompt="Please provide your Gmail API access token:",
-            input_type="password"
-        )
-    
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
@@ -167,13 +201,18 @@ async def make_gmail_request(
         response.raise_for_status()
         return response.json()
     except httpx.HTTPStatusError as e:
-        error_msg = f"Gmail API error: {e.response.status_code}"
+        status_code = e.response.status_code
+        error_msg = f"Gmail API error: {status_code}"
         try:
             error_data = e.response.json()
             if "error" in error_data:
                 error_msg += f" - {error_data['error'].get('message', 'Unknown error')}"
         except:
             pass
+        if status_code == 401:
+            error_msg += \
+                ". Verify that the GMAIL_ACCESS_TOKEN environment variable " \
+                "contains a valid OAuth access token."
         raise httpx.HTTPStatusError(error_msg, request=e.request, response=e.response)
 
 

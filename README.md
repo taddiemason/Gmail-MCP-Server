@@ -1,3 +1,4 @@
+THIS TOOL IS STILL UNDER DEVELOPMENT 
 # Gmail MCP Server
 
 A Docker-based Model Context Protocol (MCP) bridge server that provides AI-assisted Gmail management through OpenWebUI. This server enables AI agents to search, read, send, and organize emails via natural language commands.
@@ -89,7 +90,7 @@ sudo docker-compose up -d --build
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/Gmail-MCP-Server.git
+git clone https://github.com/taddiemason/Gmail-MCP-Server.git
 cd Gmail-MCP-Server
 ```
 
