@@ -81,8 +81,10 @@ app.post('/v1/tools/execute', async (req, res) => {
 
 // Build the Docker exec command based on tool name and arguments
 function buildMCPCommand(toolName, args) {
-  // Serialize arguments as JSON - no shell escaping needed with heredoc
-  const argsJson = JSON.stringify(args || {});
+  // Escape JSON for shell - backslash before double quotes
+  const argsJson = JSON.stringify(args || {})
+    .replace(/\\/g, '\\\\')   // Escape backslashes: \ -> \\
+    .replace(/"/g, '\\"');     // Escape double quotes: " -> \"
 
   // Strip "gmail/" prefix if present
   const cleanToolName = toolName.replace(/^gmail\//, '');
@@ -140,9 +142,8 @@ async def run():
             print(json.dumps({'error': 'Tool not found: ${mcpToolName}'}))
             sys.exit(1)
 
-        # Parse arguments from JSON string
-        args_json = '''${argsJson}'''
-        args_dict = json.loads(args_json)
+        # Parse arguments - JSON is shell-escaped
+        args_dict = json.loads("${argsJson}")
 
         # Get the input model class name (e.g., gmail_search_messages -> GmailSearchInput)
         # This is a mapping of tool names to their Pydantic input models
